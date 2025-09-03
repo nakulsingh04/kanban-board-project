@@ -19,7 +19,7 @@ import { useAppSelector } from '../hooks/useAppSelector';
 import { useAppDispatch } from '../hooks/useAppDispatch';
 import { fetchBoards } from '../store/slices/boardsSlice';
 import { socketTaskCreated, socketTaskUpdated, socketTaskDeleted, socketTaskMoved } from '../store/slices/tasksSlice';
-import { updateTaskInColumn, removeTaskFromColumn, addTaskToColumn } from '../store/slices/boardsSlice';
+import { updateTaskInColumn, removeTaskFromColumn, addTaskToColumn, moveTask } from '../store/slices/boardsSlice';
 import TaskColumn from './TaskColumn';
 import TaskFilters from './TaskFilters';
 import TaskModal from './TaskModal';
@@ -45,6 +45,8 @@ function TaskBoardContent() {
   useEffect(() => {
     dispatch(fetchBoards());
   }, [dispatch]);
+
+
 
   // Socket.IO connection status monitoring
   useEffect(() => {
@@ -142,28 +144,17 @@ function TaskBoardContent() {
     });
 
     const unsubscribeTaskMoved = apiService.subscribe('task:moved', (payload) => {
-      eventTracker.processEvent('task:moved', payload, (payload) => {
-        const { taskId, sourceColumnId, destinationColumnId, newIndex, task } = payload;
-        addActivity(`Task moved from ${sourceColumnId} to ${destinationColumnId}`);
-        
-        // Remove from source column
-        dispatch(removeTaskFromColumn({ 
-          columnId: sourceColumnId, 
-          taskId: taskId 
-        }));
-        
-        // Add to destination column at the specified index
-        if (task) {
-          dispatch(addTaskToColumn({ 
-            columnId: destinationColumnId, 
-            task: { ...task, columnId: destinationColumnId },
-            index: newIndex
-          }));
-        }
-        
-        // Update tasks slice
-        dispatch(socketTaskMoved({ taskId, sourceColumnId, destinationColumnId, newIndex }));
-      });
+      const { taskId, sourceColumnId, destinationColumnId, newIndex, task } = payload;
+      addActivity(`Task moved from ${sourceColumnId} to ${destinationColumnId} at index ${newIndex}`);
+      
+      dispatch(moveTask({ 
+        sourceColumnId, 
+        destinationColumnId, 
+        taskId, 
+        newIndex 
+      }));
+      
+      dispatch(socketTaskMoved({ taskId, sourceColumnId, destinationColumnId, newIndex }));
     });
 
     // Cleanup on unmount
@@ -200,13 +191,11 @@ function TaskBoardContent() {
     })
   );
 
-  // Handle drag start
   const handleDragStart = useCallback((event) => {
     const { active } = event;
     setActiveId(active.id);
   }, []);
 
-  // Handle drag end - Simplified approach
   const handleDragEnd = useCallback(async (event) => {
     const { active, over } = event;
     
@@ -216,7 +205,6 @@ function TaskBoardContent() {
       return;
     }
 
-    // If dropping on the same element, do nothing
     if (active.id === over.id) {
       return;
     }
@@ -232,27 +220,35 @@ function TaskBoardContent() {
     }
 
     try {
-      // Determine the target column and position
       let targetColumnId = activeColumn.id;
       let newIndex = activeColumn.tasks.length;
 
-      // Check if dropping on a column
       if (Object.keys(columns).includes(over.id)) {
         targetColumnId = over.id;
         newIndex = columns[targetColumnId].tasks.length;
       } else {
-        // Dropping on another task
         const overTask = findTaskById(over.id);
         if (overTask) {
           const overColumn = findColumnByTaskId(over.id);
           if (overColumn) {
             targetColumnId = overColumn.id;
-            newIndex = overColumn.tasks.findIndex(task => task.id === over.id);
+            const overIndex = overColumn.tasks.findIndex(task => task.id === over.id);
+            
+            if (activeColumn.id === overColumn.id) {
+              const currentIndex = activeColumn.tasks.findIndex(task => task.id === active.id);
+              
+              if (currentIndex < overIndex) {
+                newIndex = overIndex;
+              } else {
+                newIndex = overIndex;
+              }
+            } else {
+              newIndex = overIndex;
+            }
           }
         }
       }
 
-      // Don't do anything if dropping in the same position
       if (activeColumn.id === targetColumnId) {
         const currentIndex = activeColumn.tasks.findIndex(task => task.id === active.id);
         if (currentIndex === newIndex) {
@@ -260,9 +256,8 @@ function TaskBoardContent() {
         }
       }
 
-      addActivity(`Moving task to ${targetColumnId}`);
+      addActivity(`Moving task from ${activeColumn.id} to ${targetColumnId} at index ${newIndex}`);
 
-      // Send move request via HTTP API
       await apiService.moveTask({
         taskId: active.id,
         sourceColumnId: activeColumn.id,
@@ -270,10 +265,8 @@ function TaskBoardContent() {
         newIndex
       });
       
-      // The Socket.IO event will handle the real-time update
-      
     } catch (error) {
-      console.error('❌ Error during drag and drop:', error);
+      console.error('Error during drag and drop:', error);
       addActivity(`Error: Failed to move task`);
     }
   }, [columns, findTaskById, findColumnByTaskId, addActivity]);

@@ -3,30 +3,28 @@
 import { useState, useCallback } from 'react';
 import { taskValidationSchema, validateField, validateForm } from '../utils/validation';
 
-export default function AddTaskForm({ onSubmit, onCancel }) {
+export default function AddTaskForm({ onSubmit, onCancel, columnId }) {
   const [formData, setFormData] = useState({
     title: '',
     description: '',
     priority: 'medium',
+    columnId: columnId || 'todo',
   });
   const [errors, setErrors] = useState({});
 
   const handleSubmit = useCallback(async (e) => {
     e.preventDefault();
     
-    // Validate entire form with Yup
     const { isValid, errors: validationErrors } = await validateForm(taskValidationSchema, formData);
     
     if (isValid) {
-      // If validation passes, submit the form
       onSubmit(formData);
-      setFormData({ title: '', description: '', priority: 'medium' });
+      setFormData({ title: '', description: '', priority: 'medium', columnId: columnId || 'todo' });
       setErrors({});
     } else {
-      // Set validation errors
       setErrors(validationErrors);
     }
-  }, [formData, onSubmit]);
+  }, [formData, onSubmit, columnId]);
 
   const handleChange = useCallback(async (e) => {
     const { name, value } = e.target;
@@ -37,11 +35,9 @@ export default function AddTaskForm({ onSubmit, onCancel }) {
     
     setFormData(newFormData);
     
-    // Real-time validation with Yup
     const { isValid, error } = await validateField(taskValidationSchema, name, value, newFormData);
     
     if (isValid) {
-      // Clear error if validation passes
       if (errors[name]) {
         setErrors(prev => ({
           ...prev,
@@ -49,7 +45,6 @@ export default function AddTaskForm({ onSubmit, onCancel }) {
         }));
       }
     } else {
-      // Set error if validation fails
       setErrors(prev => ({
         ...prev,
         [name]: error,
@@ -59,9 +54,9 @@ export default function AddTaskForm({ onSubmit, onCancel }) {
 
   const handleCancel = useCallback(() => {
     onCancel();
-    setFormData({ title: '', description: '', priority: 'medium' });
+    setFormData({ title: '', description: '', priority: 'medium', columnId: columnId || 'todo' });
     setErrors({});
-  }, [onCancel]);
+  }, [onCancel, columnId]);
 
   return (
     <form 

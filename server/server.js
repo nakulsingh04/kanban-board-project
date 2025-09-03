@@ -7,13 +7,15 @@ import { createServer } from 'http';
 import { Server } from 'socket.io';
 import dotenv from 'dotenv';
 import { serverConfig } from './utils/config.js';
-// Using built-in fetch API (available in Node.js 18+)
+
 dotenv.config();
 
 import { errorHandler, notFound } from './utils/asyncHandler.js';
 
-// Import routes
+
 import taskRoutes from './routes/tasks.js';
+
+import { seedDatabase } from './data/seedData.js';
 
 const app = express();
 const server = createServer(app);
@@ -25,7 +27,6 @@ const io = new Server(server, {
   }
 });
 
-// Make io available to routes
 app.set('io', io);
 
 // Middleware
@@ -35,7 +36,6 @@ app.use(cors({
   credentials: true
 }));
 
-// Rate limiting
 const limiter = rateLimit({
   windowMs: serverConfig.rateLimit.windowMs,
   max: serverConfig.rateLimit.maxRequests,
@@ -46,14 +46,9 @@ const limiter = rateLimit({
 });
 app.use('/api/', limiter);
 
-// Body parsing middleware
 app.use(express.json({ limit: '10mb' }));
 app.use(express.urlencoded({ extended: true, limit: '10mb' }));
-
-// Routes
 app.use('/api/tasks', taskRoutes);
-
-// Health check endpoint
 app.get('/health', (req, res) => {
   res.json({
     success: true,
@@ -62,10 +57,7 @@ app.get('/health', (req, res) => {
     uptime: process.uptime()
   });
 });
-
-// Socket.io connection handling
 io.on('connection', (socket) => {
-  // Join a room for real-time updates
   socket.on('join:board', (boardId) => {
     socket.join(`board:${boardId}`);
   });
@@ -78,8 +70,6 @@ io.on('connection', (socket) => {
   // Handle task movement from client
   socket.on('task:move', async (data) => {
     try {
-      // The frontend now makes the HTTP request directly, so we just broadcast the event
-      // Broadcast to ALL clients (including sender) for real-time sync
       io.emit('task:moved', {
         taskId: data.taskId,
         sourceColumnId: data.sourceColumnId,
@@ -87,45 +77,35 @@ io.on('connection', (socket) => {
         newIndex: data.newIndex
       });
     } catch (error) {
-      // Handle error silently
     }
   });
 
-  // Handle task creation from client
   socket.on('task:create', (data) => {
-    // Broadcast to ALL clients for real-time sync
     io.emit('task:created', data);
   });
 
-  // Handle task deletion from client
   socket.on('task:delete', (data) => {
-    // Broadcast to ALL clients for real-time sync
     io.emit('task:deleted', data);
   });
 
-  // Handle task updates from client
   socket.on('task:update', (data) => {
-    // Broadcast to ALL clients for real-time sync
     io.emit('task:updated', data);
   });
 
-  // Handle disconnection
   socket.on('disconnect', () => {
-    // Client disconnected
   });
 });
 
-// Error handling middleware
 app.use(notFound);
 app.use(errorHandler);
 
 // MongoDB connection
 const connectDB = async () => {
   try {
-    const conn = await mongoose.connect(serverConfig.mongodb.uri, {
-      useNewUrlParser: true,
-      useUnifiedTopology: true,
-    });
+    const mongoUri = process.env.MONGODB_URI || 'mongodb://localhost:27017/task-management';
+    console.log('Connecting to MongoDB:', mongoUri);
+    const conn = await mongoose.connect(mongoUri);
+    console.log(`MongoDB Connected: ${conn.connection.host}`);
   } catch (error) {
     console.error('MongoDB connection error:', error);
     process.exit(1);
@@ -133,23 +113,44 @@ const connectDB = async () => {
 };
 
 // Start server
-const PORT = serverConfig.server.port;
+const PORT = process.env.PORT || 3001;
 
 const startServer = async () => {
   await connectDB();
+  
+  // Auto-seed database in development mode
+  if (process.env.NODE_ENV === 'development') {
+    try {
+      console.log('Development mode detected - checking for seed data...');
+      const Task = mongoose.model('Task');
+      const User = mongoose.model('User');
+      
+      // Check if database is empty
+      const taskCount = await Task.countDocuments();
+      const userCount = await User.countDocuments();
+      
+      if (taskCount === 0 && userCount === 0) {
+        console.log('Database is empty - running auto-seed...');
+        const result = await seedDatabase();
+        console.log(`Auto-seed completed: ${result.users.length} users and ${result.tasks} tasks created`);
+      } else {
+        console.log(`Database already has data: ${userCount} users and ${taskCount} tasks`);
+      }
+    } catch (error) {
+      console.error('Auto-seed error:', error);
+    }
+  }
   
   server.listen(PORT, () => {
     console.log(`Server running on port ${PORT}`);
   });
 };
 
-// Handle unhandled promise rejections
 process.on('unhandledRejection', (err, promise) => {
   console.error(`Error: ${err.message}`);
   server.close(() => process.exit(1));
 });
 
-// Handle uncaught exceptions
 process.on('uncaughtException', (err) => {
   console.log(`Error: ${err.message}`);
   process.exit(1);

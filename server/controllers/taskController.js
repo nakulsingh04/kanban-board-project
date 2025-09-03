@@ -42,12 +42,11 @@ export const getAllTasks = async (req, res) => {
 export const createTask = async (req, res) => {
   const taskData = {
     ...req.body,
-    createdBy: req.user?._id || null // Will be null for now, add auth later
+    createdBy: req.user?._id || null
   };
 
   const task = await createDocument(Task, taskData);
   
-  // Emit real-time update
   taskEvents.created(req, task);
   
   return apiResponse({ 
@@ -113,7 +112,6 @@ export const moveTask = async (req, res) => {
   const { taskId, sourceColumnId, destinationColumnId, newIndex } = req.body;
   
   try {
-    // Find the task
     const task = await Task.findById(taskId);
     if (!task) {
       return apiErrorResponse({ 
@@ -123,59 +121,47 @@ export const moveTask = async (req, res) => {
       });
     }
 
-    // Update the task's column and position
     task.columnId = destinationColumnId;
     task.position = newIndex;
     await task.save();
 
-    // Update positions of other tasks to maintain proper order
     if (sourceColumnId === destinationColumnId) {
-      // Moving within the same column - reorder
-      const otherTasks = await Task.find({ 
-        columnId: destinationColumnId, 
-        _id: { $ne: taskId } 
-      }).sort({ position: 1 });
+      const allTasks = await Task.find({ columnId: destinationColumnId }).sort({ position: 1 });
+      const currentIndex = allTasks.findIndex(t => t._id.toString() === taskId);
       
-      // Recalculate positions
-      let currentPosition = 0;
-      for (const otherTask of otherTasks) {
-        if (currentPosition >= newIndex) {
-          currentPosition++;
+      if (currentIndex !== -1) {
+        allTasks.splice(currentIndex, 1);
+        
+        const insertIndex = Math.min(newIndex, allTasks.length);
+        allTasks.splice(insertIndex, 0, task);
+        
+        for (let i = 0; i < allTasks.length; i++) {
+          allTasks[i].position = i;
+          await allTasks[i].save();
         }
-        otherTask.position = currentPosition;
-        await otherTask.save();
-        currentPosition++;
       }
     } else {
-      // Moving between columns
-      // Update source column positions
       const sourceTasks = await Task.find({ columnId: sourceColumnId }).sort({ position: 1 });
       for (let i = 0; i < sourceTasks.length; i++) {
         sourceTasks[i].position = i;
         await sourceTasks[i].save();
       }
       
-      // Update destination column positions
       const destinationTasks = await Task.find({ 
         columnId: destinationColumnId,
         _id: { $ne: taskId }
       }).sort({ position: 1 });
       
-      // Insert the moved task at the correct position
-      const updatedDestinationTasks = [...destinationTasks];
-      updatedDestinationTasks.splice(newIndex, 0, task);
+      const insertIndex = Math.min(newIndex, destinationTasks.length);
+      destinationTasks.splice(insertIndex, 0, task);
       
-      // Update positions for all tasks in destination column
-      for (let i = 0; i < updatedDestinationTasks.length; i++) {
-        updatedDestinationTasks[i].position = i;
-        await updatedDestinationTasks[i].save();
+      for (let i = 0; i < destinationTasks.length; i++) {
+        destinationTasks[i].position = i;
+        await destinationTasks[i].save();
       }
     }
 
-
-
-    // Emit real-time update to all clients
-    taskEvents.moved(req, { 
+    const moveData = { 
       taskId, 
       sourceColumnId, 
       destinationColumnId, 
@@ -192,7 +178,9 @@ export const moveTask = async (req, res) => {
         dueDate: task.dueDate,
         isCompleted: task.isCompleted
       }
-    });
+    };
+    
+    taskEvents.moved(req, moveData);
     
     return apiResponse({ 
       res, 

@@ -57,6 +57,7 @@ class ApiService {
         try {
           callback(data);
         } catch (error) {
+          console.error('Error in socket callback:', error);
         }
       });
     }
@@ -173,6 +174,10 @@ class ApiService {
     try {
       const { id, ...serverTaskData } = taskData;
       
+      if (!serverTaskData.columnId) {
+        throw new Error('columnId is required');
+      }
+      
       const result = await this.request('/tasks', {
         method: 'POST',
         body: JSON.stringify(serverTaskData),
@@ -187,7 +192,6 @@ class ApiService {
 
       return result;
     } catch (error) {
-      console.error('Failed to create task:', error);
       throw error;
     }
   }

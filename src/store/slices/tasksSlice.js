@@ -115,7 +115,9 @@ const tasksSlice = createSlice({
     // Socket.IO event handlers
     socketTaskCreated: (state, action) => {
       const task = action.payload;
-      state.tasks[task.id || task._id] = task;
+      
+      const taskId = task.id || task._id;
+      state.tasks[taskId] = task;
     },
     socketTaskUpdated: (state, action) => {
       const task = action.payload;
@@ -134,10 +136,10 @@ const tasksSlice = createSlice({
     },
     socketTaskMoved: (state, action) => {
       const { taskId, sourceColumnId, destinationColumnId, newIndex } = action.payload;
-      const taskIdKey = taskId.id || taskId;
-      if (state.tasks[taskIdKey]) {
-        state.tasks[taskIdKey] = { 
-          ...state.tasks[taskIdKey], 
+      
+      if (state.tasks[taskId]) {
+        state.tasks[taskId] = { 
+          ...state.tasks[taskId], 
           columnId: destinationColumnId 
         };
       }

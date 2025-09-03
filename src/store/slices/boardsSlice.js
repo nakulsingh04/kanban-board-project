@@ -60,28 +60,24 @@ const boardsSlice = createSlice({
     },
     addTaskToColumn: (state, action) => {
       const { columnId, task, index } = action.payload;
+      
       if (state.columns[columnId]) {
-        // Ensure task has proper id field
         const taskWithId = { ...task, id: task.id || task._id };
         
-        // Check if task already exists in this column
         const existingTaskIndex = state.columns[columnId].tasks.findIndex(
           existingTask => existingTask.id === taskWithId.id
         );
         
         if (existingTaskIndex !== -1) {
-          // Task already exists, update it instead of adding
           state.columns[columnId].tasks[existingTaskIndex] = {
             ...state.columns[columnId].tasks[existingTaskIndex],
             ...taskWithId
           };
         } else {
-          // Task doesn't exist, add it
-          if (typeof index === 'number') {
-            // Insert at specific index
-            state.columns[columnId].tasks.splice(index, 0, taskWithId);
+          if (typeof index === 'number' && index >= 0) {
+            const insertIndex = Math.min(index, state.columns[columnId].tasks.length);
+            state.columns[columnId].tasks.splice(insertIndex, 0, taskWithId);
           } else {
-            // Add to end
             state.columns[columnId].tasks.push(taskWithId);
           }
         }
@@ -89,6 +85,7 @@ const boardsSlice = createSlice({
     },
     removeTaskFromColumn: (state, action) => {
       const { columnId, taskId } = action.payload;
+      
       if (state.columns[columnId]) {
         state.columns[columnId].tasks = state.columns[columnId].tasks.filter(
           task => task.id !== taskId
@@ -98,22 +95,28 @@ const boardsSlice = createSlice({
     moveTask: (state, action) => {
       const { sourceColumnId, destinationColumnId, taskId, newIndex } = action.payload;
       
-      // Find the task in source column
       const sourceColumn = state.columns[sourceColumnId];
       const destinationColumn = state.columns[destinationColumnId];
       
       if (sourceColumn && destinationColumn) {
         const taskIndex = sourceColumn.tasks.findIndex(task => task.id === taskId);
+        
         if (taskIndex !== -1) {
           const task = sourceColumn.tasks[taskIndex];
           
-          // Remove from source
           sourceColumn.tasks.splice(taskIndex, 1);
           
-          // Add to destination
-          destinationColumn.tasks.splice(newIndex, 0, task);
+          let insertIndex = newIndex;
+          if (sourceColumnId === destinationColumnId) {
+            if (taskIndex < newIndex) {
+              insertIndex = newIndex - 1;
+            }
+          }
           
-          // Update the task's columnId
+          insertIndex = Math.max(0, Math.min(insertIndex, destinationColumn.tasks.length));
+          
+          destinationColumn.tasks.splice(insertIndex, 0, task);
+          
           task.columnId = destinationColumnId;
         }
       }
