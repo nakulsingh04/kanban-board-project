@@ -1,26 +1,191 @@
-@import "tailwindcss";
+@import 'tailwindcss';
 
-:root {
-  --background: #ffffff;
-  --foreground: #171717;
+/* Custom utilities for task management */
+.line-clamp-2 {
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
 }
 
-@theme inline {
-  --color-background: var(--background);
-  --color-foreground: var(--foreground);
-  --font-sans: var(--font-geist-sans);
-  --font-mono: var(--font-geist-mono);
+/* Enhanced accessibility styles */
+.focus-visible {
+  outline: 2px solid #3b82f6;
+  outline-offset: 2px;
 }
 
-@media (prefers-color-scheme: dark) {
-  :root {
-    --background: #0a0a0a;
-    --foreground: #ededed;
+/* High contrast mode support */
+@media (prefers-contrast: high) {
+  .bg-gray-50 {
+    background-color: #ffffff;
+  }
+  
+  .border-gray-200 {
+    border-color: #000000;
+  }
+  
+  .text-gray-600 {
+    color: #000000;
   }
 }
 
-body {
-  background: var(--background);
-  color: var(--foreground);
-  font-family: Arial, Helvetica, sans-serif;
+/* Reduced motion support */
+@media (prefers-reduced-motion: reduce) {
+  * {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+  }
+}
+
+/* Screen reader only text */
+.sr-only {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  padding: 0;
+  margin: -1px;
+  overflow: hidden;
+  clip: rect(0, 0, 0, 0);
+  white-space: nowrap;
+  border: 0;
+}
+
+/* Enhanced drag and drop animations */
+@keyframes dragPulse {
+  0% {
+    transform: scale(1);
+    box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1);
+  }
+  50% {
+    transform: scale(1.05);
+    box-shadow: 0 20px 25px -5px rgba(0, 0, 0, 0.1), 0 10px 10px -5px rgba(0, 0, 0, 0.04);
+  }
+  100% {
+    transform: scale(1);
+    box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1);
+  }
+}
+
+.drag-pulse {
+  animation: dragPulse 0.6s ease-in-out;
+}
+
+/* Smooth transitions for all interactive elements */
+* {
+  transition-property: transform, box-shadow, border-color, background-color, opacity;
+  transition-timing-function: cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+/* Enhanced drop zone feedback */
+.drop-zone-active {
+  background: linear-gradient(135deg, #f0f9ff 0%, #e0f2fe 100%);
+  border: 2px dashed #3b82f6 !important;
+  box-shadow: inset 0 0 0 1px rgba(59, 130, 246, 0.1), 0 4px 12px rgba(59, 130, 246, 0.15);
+  transform: scale(1.02);
+  transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+/* Improved drop zone visibility */
+.column-drop-zone {
+  transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+  min-height: 200px;
+  position: relative;
+}
+
+.column-drop-zone:hover {
+  background: linear-gradient(135deg, #f8fafc 0%, #f1f5f9 100%);
+  border-color: #cbd5e1;
+}
+
+/* Column drop zone enhancement */
+.column-drop-zone {
+  transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+  min-height: 400px;
+}
+
+.column-drop-zone:hover {
+  background: linear-gradient(135deg, #f8fafc 0%, #f1f5f9 100%);
+}
+
+/* Task item drag states */
+.task-item-dragging {
+  opacity: 0.5;
+  transform: rotate(2deg) scale(1.05);
+  box-shadow: 0 20px 25px -5px rgba(0, 0, 0, 0.1), 0 10px 10px -5px rgba(0, 0, 0, 0.04);
+  z-index: 1000;
+}
+
+/* Enhanced drag handle styles */
+.cursor-grab {
+  cursor: grab;
+}
+
+.cursor-grab:active {
+  cursor: grabbing;
+}
+
+/* Better drag feedback */
+[data-task-id] {
+  transition: all 0.2s ease;
+}
+
+[data-task-id]:hover {
+  transform: translateY(-1px);
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
+}
+
+/* Active drag state */
+.task-item-dragging-active {
+  opacity: 0.8;
+  transform: rotate(2deg) scale(1.02);
+  box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.25);
+  z-index: 1000;
+  background: linear-gradient(135deg, #f0f9ff 0%, #e0f2fe 100%);
+  border: 2px solid #3b82f6;
+}
+
+/* Improved drag handle visibility */
+.task-item-hover:hover .text-gray-400 {
+  color: #6b7280;
+}
+
+/* Prevent text selection during drag */
+.task-item-hover {
+  user-select: none;
+  -webkit-user-select: none;
+  -moz-user-select: none;
+  -ms-user-select: none;
+}
+
+/* Enhanced drag feedback */
+.task-item-hover:active {
+  transform: scale(1.02);
+  transition: transform 0.1s ease-out;
+}
+
+/* Smooth drop animation */
+@keyframes dropAnimation {
+  0% {
+    transform: scale(1.05) rotate(2deg);
+    opacity: 0.8;
+  }
+  100% {
+    transform: scale(1) rotate(0deg);
+    opacity: 1;
+  }
+}
+
+.drop-animation {
+  animation: dropAnimation 0.3s ease-out;
+}
+
+/* Task item hover effects */
+.task-item-hover {
+  transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+.task-item-hover:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 10px 25px -5px rgba(0, 0, 0, 0.1), 0 10px 10px -5px rgba(0, 0, 0, 0.04);
 }
